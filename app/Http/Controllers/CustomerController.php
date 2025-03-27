@@ -4,10 +4,20 @@ namespace App\Http\Controllers;
 
 use App\Models\Customer;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
 
-class CustomerController extends Controller
+class CustomerController extends Controller implements HasMiddleware
 {
+    public static function middleware()
+    {
+        return [
+            new Middleware('auth:sanctum', except: ['index', 'show'])
+        ];
+    }
+
     public function index()
     {
         $customers = Customer::all();
@@ -44,7 +54,8 @@ class CustomerController extends Controller
             ], 422);
         }
 
-        $customer = Customer::create($request->all());
+        // I feel like this code is wrong!
+        $customer = $request->user()->customers()->create($request->all());
 
         return response()->json([
             'status'=> true,
@@ -55,6 +66,9 @@ class CustomerController extends Controller
 
     public function update(Request $request, $id)
     {
+        $customer = Customer::findOrFail($id);
+        Gate::authorize('modify', $customer);
+
         $validate = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:customers,email,'
@@ -68,7 +82,7 @@ class CustomerController extends Controller
             ], 422);
         }
 
-        $customer = Customer::findOrFail($id);
+        // $customer = Customer::findOrFail($id);
         $customer->update($request->all());
 
         return response()->json([
@@ -80,7 +94,11 @@ class CustomerController extends Controller
 
     public function destroy($id)
     {
+        // Gate::authorize('modify', $id);
         $customer = Customer::findOrFail($id);
+        Gate::authorize('modify', $customer);
+
+        // $customer = Customer::findOrFail($id);
         $customer->delete();
 
         return response()->json([
